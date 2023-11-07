@@ -1,0 +1,171 @@
+import pandas as pd
+from PySimpleGUI import PySimpleGUI as sg
+
+#variaveis
+salario = int('1485')
+meta_min = float('0.7')
+meta_max = float('1.5')
+excel = "C:/Users/pmendonca/.vscode/Python/Araujo/rn.csv"
+
+logins = pd.read_csv("C://Users/pmendonca/.vscode/Python/Araujo/login.csv", encoding="cp1252", sep=";")
+
+df = pd.read_csv("C://Users/pmendonca/.vscode/Python/Araujo/rn.csv", encoding="cp1252", sep=";")
+
+#FrontEnd
+def janela_login():
+    sg.theme('Reddit')
+    layout = [
+        [sg.Text('Usuário')],[sg.Input(key='Usuário')],
+        [sg.Text('Senha')],[sg.Input(key='Senha', password_char='*')],
+        [sg.Button('Confirmar', bind_return_key=True)],
+        [sg.Text('',key='mensagem')]
+    ]
+    return sg.Window('Login', layout=layout, finalize=True)
+
+def janela_resultado():
+    sg.theme('Reddit')
+    layout = [
+        [sg.Button('Calcular',bind_return_key=True)],
+        [sg.Text('...',key='mensagem2')]
+    ]
+    return sg.Window('Remuneração Flexivel', layout=layout, finalize=True)
+
+#Magia acontecendo
+janela1, janela2 = janela_login(), None
+while True:
+    janela, evento, valores = sg.read_all_windows()
+#Quando a janela fechar.
+    if janela == janela1 and evento == sg.WIN_CLOSED:
+        break
+#ir para a próxima janela
+    if janela == janela1 and evento == 'Confirmar':
+        teste = valores['Usuário']
+        testes = valores['Senha']
+        login = logins[logins['Usuario'] == str(teste)]
+        login_rcv = login.iat[0,0]
+        senha_rcv = login.iat[0,1]
+        rn_cod = login.iat[0,3]
+        usuario = logins['Usuario']
+        senha = logins['Senha']
+        if teste == login_rcv and testes == senha_rcv:
+            janela['mensagem'].update((f'Bem vindo(a), {login_rcv}'))
+            janela1.hide()
+            janela2 = janela_resultado()
+        else:
+            janela['mensagem'].update((f'Usuário ou Senha incorreto(s)'))
+#segunda janela
+    if janela == janela2 and evento == sg.WIN_CLOSED:
+        break
+    if janela == janela2 and evento == 'Calcular':
+#Back End
+#Filtrar pelo RN
+        df_rn = df[df['Cod Setor'] == int(rn_cod)]
+#Selecionar o RN Filtrado
+        rn = df_rn.iat[0,1]
+#Meta de Hectolitro do RN
+        meta_rn = df_rn['Meta Hecto'].apply(float).sum()
+#Hectolitro Vendido pelo RN
+        hecto_rn = df_rn['Realizado Hecto'].apply(float).sum()
+#Filtrado a meta e o realizado pelo tipo RGB ROTA (HE + CRAFT+ MATCH) - PESO 2
+        RGB_HCM1 = 'RGB ROTA (HE + CRAFT+ MATCH) - PESO 2   '    
+        RGB_HCM_realizado = df_rn[df_rn['Nome Categoria'] == RGB_HCM1]['Realizado Hecto'].apply(float).sum()
+        RGB_HCM_meta = df_rn[df_rn['Nome Categoria'] == RGB_HCM1]['Meta Hecto'].apply(float).sum()
+        RGB_HCM_pontosmeta = (RGB_HCM_meta*2)
+        RGB_HCM_pontos = (RGB_HCM_realizado*2)
+        #Filtrado a meta e o realizado pelo tipo OW ROTA (HE + CRAFT+ MATCH) - PESO 1
+        Ow_HCM1 = 'OW ROTA (HE + CRAFT+ MATCH) - PESO 1    '    
+        Ow_HCM_realizado = df_rn[df_rn['Nome Categoria'] == Ow_HCM1]['Realizado Hecto'].apply(float).sum()
+        Ow_HCM_meta = df_rn[df_rn['Nome Categoria'] == Ow_HCM1]['Meta Hecto'].apply(float).sum()
+        Ow_HCM_pontosmeta = (Ow_HCM_meta*1)
+        Ow_HCM_pontos = (Ow_HCM_realizado*1)
+        HCM_tendencia = float(((RGB_HCM_pontos+Ow_HCM_pontos)/(RGB_HCM_pontosmeta+Ow_HCM_pontosmeta)))
+        if HCM_tendencia > meta_min:
+            HCM_valor = HCM_tendencia*(salario*0.2)
+        elif HCM_tendencia > meta_max:  
+            HCM_valor = (HCM_tendencia*1.5)
+        elif HCM_tendencia < meta_min:
+            HCM_valor = float('0')
+        #Filtrado a meta e o realizado pelo tipo MARKETPLACE - PESO 1
+        MKP11 = 'MARKETPLACE - PESO 1                    '   
+        MKP1_realizado = df_rn[df_rn['Nome Categoria'] == MKP11]['Realizado Hecto'].apply(float).sum()
+        MKP1_meta = df_rn[df_rn['Nome Categoria'] == MKP11]['Meta Hecto'].apply(float).sum()
+        MKP1_pontosmeta = (MKP1_meta*1)
+        MKP1_pontos = (MKP1_realizado*1)
+        #Filtrado a meta e o realizado pelo tipo MARKETPLACE 2 - PESO 4     
+        MKP21 = 'MARKETPLACE 2 - PESO 4                  '   
+        MKP2_realizado = df_rn[df_rn['Nome Categoria'] == MKP21]['Realizado Hecto'].apply(float).sum()
+        MKP2_meta = df_rn[df_rn['Nome Categoria'] == MKP21]['Meta Hecto'].apply(float).sum()
+        MKP2_pontosmeta = (MKP2_meta*4)
+        MKP2_pontos = (MKP2_realizado*4)
+        MKP_tendencia = float(((MKP1_pontos+MKP2_pontos)/(MKP1_pontosmeta+MKP2_pontosmeta)))
+        if MKP_tendencia < meta_min:
+            MKP_valor = float('0')
+        elif MKP_tendencia > meta_min:
+            MKP_valor = MKP_tendencia*(salario*0.1)
+        elif MKP_tendencia > meta_max:
+            MKP_valor = (MKP_tendencia*1.5)
+        #Filtrado a meta e o realizado pelo tipo RGB ROTA (CORE TT + VALUE) - PESO 2     
+        RGB_CTV1 = 'RGB ROTA (CORE TT + VALUE) - PESO 2     '
+        RGB_CTV_realizado = df_rn[df_rn['Nome Categoria'] == RGB_CTV1]['Realizado Hecto'].apply(float).sum()
+        RGB_CTV_meta = df_rn[df_rn['Nome Categoria'] == RGB_CTV1]['Meta Hecto'].apply(float).sum()
+        RGB_CTV_pontosmeta = (RGB_CTV_meta*2)
+        RGB_CTV_pontos = (RGB_CTV_realizado*2)
+        #Filtrado a meta e o realizado pelo tipo OW ROTA (CORE TT + VALUE) - PESO 1    
+        Ow_CTV1 = 'OW ROTA (CORE TT + VALUE) - PESO 1      '   
+        Ow_CTV_realizado = df_rn[df_rn['Nome Categoria'] == Ow_CTV1]['Realizado Hecto'].apply(float).sum()
+        Ow_CTV_meta = df_rn[df_rn['Nome Categoria'] == Ow_CTV1]['Meta Hecto'].apply(float).sum()
+        Ow_CTV_pontosmeta = (Ow_CTV_meta*1)
+        Ow_CTV_pontos = (Ow_CTV_realizado*1)
+        CTV_tendencia = float(((Ow_CTV_pontos+RGB_CTV_pontos)/(Ow_CTV_pontosmeta+RGB_CTV_pontosmeta)))
+        if CTV_tendencia < meta_min:
+            CTV_valor = float('0')
+        elif CTV_tendencia > meta_min:
+            CTV_valor = CTV_tendencia*(salario*0.15)
+        elif CTV_tendencia > meta_max:
+            CTV_valor = (CTV_tendencia*1.5)
+        #Filtrado a meta e o realizado pelo tipo NAB MULTI - PESO 1 
+        Nab_multi1 = 'NAB MULTI - PESO 1                      '  
+        Nab_multi_realizado = df_rn[df_rn['Nome Categoria'] == Nab_multi1]['Realizado Hecto'].apply(float).sum()
+        Nab_multi_meta = df_rn[df_rn['Nome Categoria'] == Nab_multi1]['Meta Hecto'].apply(float).sum()
+        Nab_multi_pontosmeta = (Nab_multi_meta*1)
+        Nab_multi_pontos = (Nab_multi_realizado*1)
+        #Filtrado a meta e o realizado pelo tipo NAB SINGLE - PESO 2 
+        Nab_single1 = 'NAB SINGLE - PESO 2                     '    
+        Nab_single_realizado = df_rn[df_rn['Nome Categoria'] == Nab_single1]['Realizado Hecto'].apply(float).sum()
+        Nab_single_meta = df_rn[df_rn['Nome Categoria'] == Nab_single1]['Meta Hecto'].apply(float).sum()
+        Nab_single_pontosmeta = (Nab_single_meta*2)
+        Nab_single_pontos = (Nab_single_realizado*2)
+        Nab_tendencia = float(((Nab_single_pontos+Nab_multi_pontos)/(Nab_single_pontosmeta+Nab_multi_pontosmeta)))
+        if Nab_tendencia < meta_min:
+            Nab_valor = float('0')
+        elif Nab_tendencia > meta_min:
+            Nab_valor = Nab_tendencia*(salario*0.15)
+        elif Nab_tendencia > meta_max:
+            Nab_valor = (Nab_tendencia*1.5)
+        remuneraçao = float(Nab_valor+CTV_valor+MKP_valor+HCM_valor)
+#Juntar tudo em um unico DF
+        Finalxls = (f'''
+O Representante de Negócios {rn}, tinha a meta de Hecto de {meta_rn}hL, e atingiu um total de {hecto_rn}hL,
+Sua meta de Cerveja RBG Rota: He + Craft + Match, que possuia o peso de 2, 
+tinha a meta de {RGB_HCM_meta}hL, e foi atingido um total de {RGB_HCM_realizado}hL, somando um total de {RGB_HCM_pontos} pontos.
+Sua meta de OW Rota: He + Craft + Match, que possuia o peso de 1, 
+tinha a meta de {Ow_HCM_meta}hL, e foi atingido um total de {Ow_HCM_realizado}hL, somando um total de {Ow_HCM_pontos} pontos.
+Sua meta de Cerveja OW Rota: MARKETPLACE, que possuia o peso de 1, 
+tinha a meta de {MKP1_meta}hL, e foi atingido um total de {MKP1_realizado}hL, somando um total de {MKP1_pontos} pontos.
+Sua meta de Cerveja OW Rota: MARKETPLACE, que possuia o peso de 4, 
+tinha a meta de {MKP2_meta}hL, e foi atingido um total de {MKP2_realizado}hL, somando um total de {MKP2_pontos} pontos.
+Sua meta de RGB ROTA (CORE TT + VALUE), que possuia o peso de 2, 
+tinha a meta de {RGB_CTV_meta}hL, e foi atingido um total de {RGB_CTV_realizado}hL, somando um total de {RGB_CTV_pontos} pontos.
+Sua meta de OW ROTA (CORE TT + VALUE), que possuia o peso de 1, 
+tinha a meta de {Ow_CTV_meta}hL, e foi atingido um total de {Ow_CTV_realizado}hL, somando um total de {Ow_CTV_pontos} pontos.
+Sua meta de NAB MULTI, que possuia o peso de 1, 
+tinha a meta de {Nab_multi_meta}hL, e foi atingido um total de {Nab_multi_realizado}hL, somando um total de {Nab_multi_pontos} pontos.
+Sua meta de NAB SINGLE, que possuia o peso de 2, 
+tinha a meta de {Nab_single_meta}hL, e foi atingido um total de {Nab_single_realizado}hL, somando um total de {Nab_single_pontos} pontos.
+O valor da remuneração final foi HCM = R${HCM_valor}, CTV = R${CTV_valor}, MKP = R${MKP_valor} e NAB = R${Nab_valor}.
+Totalizando um total de R${remuneraçao}.
+''')
+        janela['mensagem2'].update((Finalxls))
+    else:
+        janela['mensagem'].update(('Erro'))
+        
